@@ -15,10 +15,13 @@
     {% if cert_csv.stat.exists %}
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...result_analyzer: CSV output file located: {{ cc_path }}crawlerCert.csv"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...result_analyzer: processing CSV content for analysis"
-    {% for line in cert_csv_content.stdout_lines %}
+    {% for line in cert_csv_content.stdout_lines[1:] %}
+    {% set columns = line.split(',') %}
+    {% if columns[1] != "Store Certficate" %}
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...result_analyzer: {{ line }}"
+    {% endif %}
     {% endfor %}
-    
+
     # Count different types of results
     $totalCerts = (Get-Content "{{ cc_path }}crawlerCert.csv" | Measure-Object -Line).Lines - 1
     $invalidCerts = (Get-Content "{{ cc_path }}crawlerCert.csv" | Select-String "Invalid Certificate" | Measure-Object).Count
@@ -46,6 +49,7 @@
     invalid_cert_lines: >-
       {{
         cert_csv_content.stdout.splitlines()[1:]
+        | reject('search', '^.*Store Certficate.*$')
         | select('search', 'Invalid Certificate')
         | map('split', ',')
         | map(attribute=2)
@@ -61,7 +65,12 @@
 - name: Process password error certificates
   set_fact:
     password_error_certs: "{{ password_error_certs + [item.split(',')[2]] }}"
-  loop: "{{ cert_csv_content.stdout.splitlines()[1:] }}"
+  loop: >-
+    {{
+      cert_csv_content.stdout_lines[1:]
+      | reject('search', '^.*Store Certficate.*$')
+      | list
+    }}
   when: 
     - cert_csv.stat.exists
     - "'CERT Password is Not Valid' in item"
@@ -76,7 +85,12 @@
 - name: Process invalid certificates
   set_fact:
     invalid_certs: "{{ invalid_certs + [item.split(',')[2]] }}"
-  loop: "{{ cert_csv_content.stdout.splitlines()[1:] }}"
+  loop: >-
+    {{
+      cert_csv_content.stdout_lines[1:]
+      | reject('search', '^.*Store Certficate.*$')
+      | list
+    }}
   when: 
     - cert_csv.stat.exists
     - "'Invalid Certificate' in item"
@@ -90,6 +104,7 @@
         cert_csv_content.stdout.splitlines()[1:]
         | reject('search', 'CERT Password is Not Valid')
         | reject('search', 'Invalid Certificate')
+        | reject('search', '^.*Store Certficate.*$')
         | list
       }}
   when: cert_csv.stat.exists

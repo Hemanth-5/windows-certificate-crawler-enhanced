@@ -20,6 +20,11 @@
             } else {
               New-Item -Path "{{ cc_path }}playbook_runtime.log" -ItemType File -Force
             }
+            # Ensure failure.log is deleted if it exists
+            $failLog = "{{ cc_path }}failure.log"
+            if (Test-Path -Path $failLog) {
+              Remove-Item -Path $failLog -Force
+            }
             # Log the start time
             $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
             Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :.main: *************** Certificate Crawler started ***************"
@@ -132,33 +137,29 @@
             Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :.main: *************** Certificate Crawler completed ***************"
 
       rescue:
-        - name: Log failure and email attempt
+        - name: Copy failure logging script
+          win_copy:
+            content: "{{ lookup('template', 'log_failure.ps1.j2') }}"
+            dest: "{{ cc_path }}log_failure.ps1"
+
+        - name: Run failure logging script
           win_shell: |
-            # Ensure the directory structure exists first
-            if (-not (Test-Path -Path "{{ cc_path }}")) {
-              New-Item -Path "{{ cc_path }}" -ItemType Directory -Force
-            }
-            # Ensure the log file exists
-            if (-not (Test-Path -Path "{{ cc_path }}playbook_runtime.log")) {
-              New-Item -Path "{{ cc_path }}playbook_runtime.log" -ItemType File -Force
-            }
-            # Log failure details
-            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
-            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :..{{ ansible_failed_task.name | regex_replace(' ', '_') | lower }}: task execution failed"
-            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :..error_handler: {{ ansible_failed_result.msg | regex_replace('\r?\n',' ') }}"
-            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..notification_manager: preparing failure notification"
-            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..mail_service: sending failure notification to {{ fid }}"
-        
+            powershell.exe -ExecutionPolicy Bypass -File "{{ cc_path }}log_failure.ps1"
+
         - name: Notify failure mail
           include_role:
             name: windows_cert_crawler_install_notify
             tasks_from: send_mail
           vars:
             notify_to: "{{ fid }}"
-            notify_subject: "ACTION_REQUIRED: Certificate Crawler FAILED on {{ inventory_hostname }}"
+            notify_subject: "ACTION REQUIRED: Certificate Crawler Failure on {{ inventory_hostname }}"
             notify_body: >-
               Hello {{ fid }},<br><br>
-              Certificate crawler failed on {{ inventory_hostname }}.<br><br>
-              Please check the attached log file for error details and rerun the playbook after fixing the issues.
+              The certificate crawler has <b>failed</b> on <b>{{ inventory_hostname }}</b>.<br><br>
+              Please review the attached log files for detailed error information.<br><br>
+              After addressing the issues, you may rerun the playbook to retry the operation.<br><br>
+              Thank you.
             notify_attachment:
               - "{{ cc_path }}playbook_runtime.log"
+              - "{{ cc_path }}failure.log"
+

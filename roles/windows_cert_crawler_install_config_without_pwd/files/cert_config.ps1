@@ -118,7 +118,7 @@ else {
 # Now, add cert entries in both cases
 foreach ($cert in $certList) {
     # Check if a node with the same 'path' attribute already exists
-    $existingNode = $certificatesNode.SelectSingleNode("add[@path='$($cert.path)']")
+    $existingNode = $certificatesNode.SelectSingleNode("add[@path='$($cert.path)' and @type='$($cert.type)']")
     if ($null -ne $existingNode) {
         Write-Host "DEBUG: Certificate path already exists, skipping: $($cert.path)"
         continue
@@ -155,8 +155,8 @@ if ($storeNode -eq $null) {
     $appSettingsNode.AppendChild($storeNode) | Out-Null
 }
 
-$certFlag = if ($extRootCert -eq "True") { "Y" } else { "N" }
-$storeNode.SetAttribute("value", $certFlag)
+# $certFlag = if ($extRootCert -eq "Tre") { "Y" } else { "N" }
+$storeNode.SetAttribute("value", $extRootCert)
 
 # Save
 $xml.Save($installPath)

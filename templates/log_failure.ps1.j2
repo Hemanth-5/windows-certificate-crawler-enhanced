@@ -1,0 +1,33 @@
+# Ensure the directory exists
+if (-not (Test-Path -Path "{{ cc_path }}")) {
+  New-Item -Path "{{ cc_path }}" -ItemType Directory -Force
+}
+
+$runtimeLog = "{{ cc_path }}playbook_runtime.log"
+$failLog = "{{ cc_path }}failure.log"
+
+# Make sure playbook_runtime.log exists
+if (-not (Test-Path -Path $runtimeLog)) {
+  New-Item -Path $runtimeLog -ItemType File -Force
+}
+
+# Make sure failure.log exists
+if (-not (Test-Path -Path $failLog)) {
+  New-Item -Path $failLog -ItemType File -Force
+}
+
+$timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+
+# High-level error summary
+$msg1 = "$timestamp ERROR  :..{{ ansible_failed_task.name | regex_replace(' ', '_') | lower }}: task execution failed"
+Add-Content -Path $runtimeLog -Value $msg1
+
+$msg2 = "$timestamp INFO   :..error_handler: see failure.log for details"
+Add-Content -Path $runtimeLog -Value $msg2
+
+# Dump the raw error message as-is
+Add-Content -Path $failLog -Value "$timestamp FULL ERROR DUMP START"
+Add-Content -Path $failLog -Value @"
+{{ ansible_failed_result.msg }}
+"@
+Add-Content -Path $failLog -Value "$timestamp FULL ERROR DUMP END"

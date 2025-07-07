@@ -22,7 +22,7 @@
         },
         {
             "param-name": "extract_root_certs",
-            "default-value": "true"
+            "default-value": "Y"
         }
     ]
 }
