@@ -1,0 +1,44 @@
+---
+- name: Copy PowerShell mail script
+  win_copy:
+    src: send_mail.ps1
+    dest: "{{ cc_path }}send_mail.ps1"
+
+- name: Write email body to temp file
+  win_copy:
+    content: "{{ notify_body }}"
+    dest: "{{ cc_path }}mail_body.txt"
+
+- name: Prepare attachment argument
+  set_fact:
+    attachment_arg: >-
+      {% if notify_attachment is defined and notify_attachment|length > 0 %}
+      {% if notify_attachment is string %}
+      -AttachmentPath "{{ notify_attachment }}"
+      {% else %}
+      -AttachmentPath "{{ notify_attachment | join(';') }}"
+      {% endif %}
+      {% else %}
+      ""
+      {% endif %}
+
+- name: Send mail using PowerShell
+  win_shell: |
+    powershell.exe -ExecutionPolicy Bypass -File "{{ cc_path }}send_mail.ps1" `
+      -From "{{ notify_from }}" `
+      -To "{{ notify_to }}" `
+      -Subject "{{ notify_subject }}" `
+      -BodyFile "{{ cc_path }}mail_body.txt" `
+      -Username "{{ notify_username }}" `
+      -Password "{{ notify_password }}" `
+      -SmtpServer "{{ notify_smtp_server }}" `
+      -Port {{ notify_port }} `
+      {{ attachment_arg }}
+  register: mail_result
+  failed_when: false  # Don't fail the playbook if mail sending fails
+
+- name: Clean up temporary files
+  win_file:
+    path: "{{ cc_path }}mail_body.txt"
+    state: absent
+  ignore_errors: true

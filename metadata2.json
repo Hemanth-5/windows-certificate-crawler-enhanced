@@ -1,0 +1,24 @@
+{
+    "params": [
+        {
+            "param-name": "fid",
+            "default-value": "22z225@psgtech.ac.in"
+        },
+        {
+            "param-name": "installation_path",
+            "default-value": "C:/Temp/CertCrawler/"
+        },
+        {
+            "param-name": "operation_mode",
+            "default-value": "opmode2"
+        },
+        {
+            "param-name": "cert1_path",
+            "default-value": "C:/Temp/CertCrawler/test-certs/test2.p12"
+        },
+        {
+            "param-name": "cert1_password",
+            "default-value": "pwd2!"
+       }
+    ]
+}

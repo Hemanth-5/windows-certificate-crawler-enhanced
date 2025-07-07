@@ -1,0 +1,7 @@
+---
+# handlers/main.yml for windows_cert_crawler_install_setup
+
+- name: log_setup_role
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...setup_manager: binary components extracted and validated"

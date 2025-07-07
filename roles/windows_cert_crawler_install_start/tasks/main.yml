@@ -1,0 +1,71 @@
+# - name: Debug - Show executable paths
+#   debug:
+#     msg: 
+#       - "Encrypt.exe path: {{ encrypt_exe_path }}"
+#       - "Crawler2.exe path: {{ crawler_exe_path }}"
+#       - "CC Path: {{ cc_path }}"
+#       - "Installation Path: {{ installation_path }}"
+
+# - name: Verify current host and working directory
+#   win_shell: |
+#     $hostname = $env:COMPUTERNAME
+#     $username = $env:USERNAME
+#     $currentDir = Get-Location
+#     Write-Output "Running on host: $hostname"
+#     Write-Output "Running as user: $username"
+#     Write-Output "Current directory: $currentDir"
+#     Write-Output "Executable path exists: $(Test-Path '{{ encrypt_exe_path }}')"
+#     Write-Output "Crawler path exists: $(Test-Path '{{ crawler_exe_path }}')"
+#   register: host_info
+
+# - name: Display host information
+#   debug:
+#     msg: "{{ host_info.stdout_lines }}"
+
+- name: Execute Encrypt.exe with args
+  win_shell: >
+    powershell.exe -ExecutionPolicy Bypass -Command "Set-Location '{{ cc_path }}'; & '{{ encrypt_exe_path }}' {{ exe_arguments }}; exit $LASTEXITCODE"
+  register: exe_result
+  failed_when: exe_result.rc != 0
+  when: operation_mode == "opmode2"
+
+- name: Log detailed Encrypt.exe execution result
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...encrypt_engine: Encrypt.exe execution return code: {{ exe_result.rc }}"
+    {% if exe_result.stdout %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...encrypt_engine: stdout captured, processing output"
+    {% for line in exe_result.stdout.splitlines() %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...encrypt_engine: {{ line }}"
+    {% endfor %}
+    {% endif %}
+    {% if exe_result.stderr %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp WARNING:...encrypt_engine: stderr detected: {{ exe_result.stderr }}"
+    {% endif %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...encrypt_engine: certificate encryption phase completed"
+  when: operation_mode == "opmode2"
+
+- name: Execute Crawler2.exe
+  win_shell: >
+    powershell.exe -ExecutionPolicy Bypass -Command "Set-Location '{{ cc_path }}'; & '{{ crawler_exe_path }}'; exit $LASTEXITCODE"
+  register: exe_result
+  failed_when: exe_result.rc != 0
+
+- name: Log detailed Crawler2.exe execution result
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...crawler_engine: Crawler2.exe execution return code: {{ exe_result.rc }}"
+    {% if exe_result.stdout %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...crawler_engine: stdout captured, processing output"
+    {% for line in exe_result.stdout.splitlines() %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...crawler_engine: {{ line }}"
+    {% endfor %}
+    {% endif %}
+    {% if exe_result.stderr %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp WARNING:...crawler_engine: stderr detected: {{ exe_result.stderr }}"
+    {% endif %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...crawler_engine: certificate crawling phase completed"
+
+# - name: Display Crawler2.exe output
+#   debug:
+#     msg: "Crawler2.exe output: {{ exe_result.stdout }}"

@@ -1,0 +1,12 @@
+---
+# handlers/main.yml for windows_cert_crawler_install_config_without_pwd
+
+- name: log_collect_certs_without_pwd
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_collector: directory scan completed, certificates collected"
+
+- name: log_config_crawler_without_pwd
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...config_generator: XML configuration generated for directory-based certificates"

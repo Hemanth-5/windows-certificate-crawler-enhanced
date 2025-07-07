@@ -1,0 +1,164 @@
+---
+- name: Configure certificates on Windows
+  hosts: all
+  gather_facts: true
+  vars:
+    cc_path: "{{ installation_path }}cert_crawler_windows_v1.0.0/"
+
+  tasks:
+    - name: Certificate configuration workflow
+      block:
+        - name: Log start of workflow
+          win_shell: |
+            # Ensure the directory structure exists first
+            if (-not (Test-Path -Path "{{ cc_path }}")) {
+              New-Item -Path "{{ cc_path }}" -ItemType Directory -Force
+            }
+            # Ensure the log file exists and if exists clear it
+            if (Test-Path -Path "{{ cc_path }}playbook_runtime.log") {
+              Clear-Content -Path "{{ cc_path }}playbook_runtime.log"
+            } else {
+              New-Item -Path "{{ cc_path }}playbook_runtime.log" -ItemType File -Force
+            }
+            # Log the start time
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :.main: *************** Certificate Crawler started ***************"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...init_system: Target host: {{ inventory_hostname }}"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...init_system: Installation path: {{ cc_path }}"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :.main: Using operation mode {{ operation_mode }}"
+
+        - name: Log certificate collection mode
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cert_collector: initializing certificate collection subsystem"
+            {% if operation_mode == "opmode1" %}
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cert_collector: collection mode - directory scan without passwords"
+            {% else %}
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cert_collector: collection mode - file path with passwords"
+            {% endif %}
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cert_collector: certificate collection phase started"
+
+        - name: Include collect certificates without password role
+          include_role:
+            name: windows_cert_crawler_install_config_without_pwd
+            tasks_from: collect_certs
+          when:
+            - operation_mode == "opmode1"
+
+        - name: Include collect certificates with password role
+          include_role:
+            name: windows_cert_crawler_install_config_with_pwd
+            tasks_from: collect_certs
+          when:
+            - operation_mode == "opmode2"
+
+        - name: Log certificate collection result
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cert_collector: certificate collection completed successfully"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..setup_manager: initializing software installation subsystem"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..setup_manager: downloading and extracting crawler components"
+
+        - name: Include setup certificate crawler role
+          include_role:
+            name: windows_cert_crawler_install_setup
+
+        - name: Log setup completion
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..setup_manager: software installation completed successfully"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..setup_manager: binary location: {{ cc_path }}"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..config_manager: initializing configuration subsystem"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..config_manager: generating configuration with collected certificates"
+
+        - name: Include configure certificate crawler without password role
+          include_role:
+            name: windows_cert_crawler_install_config_without_pwd
+            tasks_from: config_crawler
+          when:
+            - operation_mode == "opmode1"
+
+        - name: Include configure certificate crawler with password role
+          include_role:
+            name: windows_cert_crawler_install_config_with_pwd
+            tasks_from: config_crawler
+          when:
+            - operation_mode == "opmode2"
+
+        - name: Log configuration phase
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..config_manager: configuration generation completed successfully"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..execution_manager: initializing crawler execution subsystem"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..execution_manager: starting certificate processing engines"
+
+        - name: Include start certificate crawler role
+          include_role:
+            name: windows_cert_crawler_install_start
+
+        - name: Log crawler execution
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..execution_manager: certificate processing engines completed"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..notification_manager: initializing notification subsystem"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..notification_manager: analyzing execution results"
+
+        - name: Prepare success mail content
+          include_role:
+            name: windows_cert_crawler_install_notify
+            tasks_from: prepare_mail
+
+        - name: Log email preparation
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..notification_manager: execution analysis completed successfully"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..mail_service: preparing notification email to {{ fid }}"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..mail_service: attaching execution logs and results"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..mail_service: initiating email transmission"
+
+        - name: Send success mail
+          include_role:
+            name: windows_cert_crawler_install_notify
+            tasks_from: send_mail
+          vars:
+            notify_to: "{{ fid }}"
+
+        - name: Log crawler completion
+          win_shell: |
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..mail_service: email transmission completed successfully"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cleanup_manager: performing cleanup operations"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..cleanup_manager: results preserved in: {{ cc_path }}"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :.main: *************** Certificate Crawler completed ***************"
+
+      rescue:
+        - name: Log failure and email attempt
+          win_shell: |
+            # Ensure the directory structure exists first
+            if (-not (Test-Path -Path "{{ cc_path }}")) {
+              New-Item -Path "{{ cc_path }}" -ItemType Directory -Force
+            }
+            # Ensure the log file exists
+            if (-not (Test-Path -Path "{{ cc_path }}playbook_runtime.log")) {
+              New-Item -Path "{{ cc_path }}playbook_runtime.log" -ItemType File -Force
+            }
+            # Log failure details
+            $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :..{{ ansible_failed_task.name | regex_replace(' ', '_') | lower }}: task execution failed"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :..error_handler: {{ ansible_failed_result.msg | regex_replace('\r?\n',' ') }}"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..notification_manager: preparing failure notification"
+            Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :..mail_service: sending failure notification to {{ fid }}"
+        
+        - name: Notify failure mail
+          include_role:
+            name: windows_cert_crawler_install_notify
+            tasks_from: send_mail
+          vars:
+            notify_to: "{{ fid }}"
+            notify_subject: "ACTION_REQUIRED: Certificate Crawler FAILED on {{ inventory_hostname }}"
+            notify_body: >-
+              Hello {{ fid }},<br><br>
+              Certificate crawler failed on {{ inventory_hostname }}.<br><br>
+              Please check the attached log file for error details and rerun the playbook after fixing the issues.
+            notify_attachment:
+              - "{{ cc_path }}playbook_runtime.log"

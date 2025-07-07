@@ -1,0 +1,3 @@
+---
+# handlers/main.yml for windows_cert_crawler_install_notify
+# Note: Mail service handlers removed - logging should be handled by calling context

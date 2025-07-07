@@ -1,0 +1,38 @@
+---
+# handlers/main.yml
+
+- name: log_collect_certs_without_pwd
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "collect_certs_without_pwd completed successfully."
+
+- name: log_collect_certs_with_pwd
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "collect_certs_with_pwd completed successfully."
+
+- name: log_setup_role
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "setup role completed successfully."
+
+- name: log_config_crawler_without_pwd
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "config_crawler_without_pwd completed successfully."
+
+- name: log_config_crawler_with_pwd
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "config_crawler_with_pwd completed successfully."
+
+- name: log_start_crawler
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "start crawler completed successfully."
+
+- name: log_prepare_mail
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "prepare_mail completed successfully."
+
+- name: log_success_mail
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "success mail sent."
+
+- name: log_failure
+  win_shell: |
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "FAILURE in task '{{ ansible_failed_task.name }}': {{ ansible_failed_result.msg | regex_replace('\r?\n',' ') }}"
