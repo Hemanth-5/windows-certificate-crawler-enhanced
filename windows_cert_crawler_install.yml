@@ -32,6 +32,20 @@
             Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...init_system: Installation path: {{ cc_path }}"
             Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :.main: Using operation mode {{ operation_mode }}"
 
+        - name: Validate FID user access to installation directory
+          block:
+            - name: Copy FID validation script
+              win_copy:
+                content: "{{ lookup('template', 'validate_fid_access.ps1.j2') }}"
+                dest: "{{ cc_path }}validate_fid_access.ps1"
+
+            - name: Run FID validation script
+              win_shell: |
+                powershell.exe -ExecutionPolicy Bypass -File "{{ cc_path }}validate_fid_access.ps1"
+              register: fid_access_check
+              failed_when: fid_access_check.rc != 0
+          when: fid is defined and fid != ""
+
         - name: Log certificate collection mode
           win_shell: |
             $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
@@ -146,7 +160,36 @@
           win_shell: |
             powershell.exe -ExecutionPolicy Bypass -File "{{ cc_path }}log_failure.ps1"
 
-        - name: Notify failure mail
+        - name: Check if failure is due to FID access issue
+          win_shell: |
+            if ($env:FID_ACCESS_ERROR) {
+              Write-Output "FID_ACCESS_FAILURE"
+            } else {
+              Write-Output "GENERAL_FAILURE"
+            }
+          register: failure_type
+
+        - name: Notify FID access failure mail
+          include_role:
+            name: windows_cert_crawler_install_notify
+            tasks_from: send_mail
+          vars:
+            notify_to: "{{ fid }}"
+            notify_subject: "ACCESS DENIED: FID {{ fid }} lacks access to {{ installation_path }}"
+            notify_body: >-
+              Hello,<br><br>
+              The certificate crawler installation has <b>failed</b> because 
+              FID <b>{{ fid }}</b> does not have write access to directory 
+              <b>{{ installation_path }}</b>.<br><br>
+              Please ensure the user has appropriate permissions and retry the installation.<br><br>
+              Error Details: {{ ansible_failed_result.msg | default('Access validation failed') }}<br><br>
+              Thank you.
+            notify_attachment:
+              - "{{ cc_path }}playbook_runtime.log"
+              - "{{ cc_path }}failure.log"
+          when: failure_type.stdout == "FID_ACCESS_FAILURE"
+
+        - name: Notify general failure mail
           include_role:
             name: windows_cert_crawler_install_notify
             tasks_from: send_mail
@@ -162,4 +205,5 @@
             notify_attachment:
               - "{{ cc_path }}playbook_runtime.log"
               - "{{ cc_path }}failure.log"
+          when: failure_type.stdout != "FID_ACCESS_FAILURE"
 

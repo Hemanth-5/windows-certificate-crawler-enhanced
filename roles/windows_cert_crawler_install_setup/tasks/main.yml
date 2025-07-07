@@ -41,6 +41,32 @@
     - name: Set fact for first time installation
       set_fact:
         first_time_install: true
+
+    - name: Change ownership of installed files to FID user
+      win_shell: |
+        # Extract username from FID
+        $fidUser = "{{ fid }}"
+        if ($fidUser -contains "/") {
+          $fidUser = $fidUser.Split("/")[1]
+        } elseif ($fidUser -contains "@") {
+          $fidUser = $fidUser.Split("@")[0]
+        }
+        
+        try {
+          # Change ownership of all files in the installation directory
+          $installPath = "{{ cc_path }}"
+          Get-ChildItem -Path $installPath -Recurse | ForEach-Object {
+            $acl = Get-Acl $_.FullName
+            $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($fidUser, "FullControl", "Allow")
+            $acl.SetAccessRule($accessRule)
+            Set-Acl -Path $_.FullName -AclObject $acl
+          }
+          
+          Write-Output "Successfully changed ownership of files to user: $fidUser"
+        } catch {
+          Write-Output "Warning: Could not change ownership to FID user: $($_.Exception.Message)"
+        }
+      when: fid is defined and fid != ""
   
   when: >
     not encrypt_exe.stat.exists or

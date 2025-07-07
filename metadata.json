@@ -2,7 +2,7 @@
     "params": [
         {
             "param-name": "fid",
-            "default-value": "22z225@psgtech.ac.in"
+            "default-value": "HEMANTH/testuser2"
         },
         {
             "param-name": "installation_path",

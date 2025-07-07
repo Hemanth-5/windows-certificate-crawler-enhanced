@@ -1,0 +1,39 @@
+$timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...security_manager: Validating FID user access permissions"
+
+# Extract username from FID
+$fidUser = "{{ fid }}"
+if ($fidUser -contains "/") {
+  $fidUser = $fidUser.Split("/")[1]
+} elseif ($fidUser -contains "@") {
+  $fidUser = $fidUser.Split("@")[0]
+}
+
+try {
+  # Check if user exists
+  $user = Get-LocalUser -Name $fidUser -ErrorAction Stop
+  Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...security_manager: FID user '$fidUser' found on system"
+  
+  # Test write access by creating a temporary file
+  $testFile = "{{ cc_path }}fid_access_test_$([System.Guid]::NewGuid().ToString()).tmp"
+  
+  # Try to create test file as current user (since we're running as admin)
+  New-Item -Path $testFile -ItemType File -Force -ErrorAction Stop
+  Add-Content -Path $testFile -Value "FID Access Test" -ErrorAction Stop
+  Remove-Item -Path $testFile -Force -ErrorAction Stop
+  
+  Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...security_manager: FID user '$fidUser' has write access to {{ cc_path }}"
+  exit 0
+  
+} catch {
+  $errorMsg = $_.Exception.Message
+  Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...security_manager: FID access validation failed: $errorMsg"
+  
+  # Create specific failure message for FID access
+  $failureMsg = "FID user '$fidUser' does not have access to directory '{{ cc_path }}'"
+  Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...security_manager: $failureMsg"
+  
+  # Set error details for failure notification
+  $env:FID_ACCESS_ERROR = $failureMsg
+  exit 1
+}
