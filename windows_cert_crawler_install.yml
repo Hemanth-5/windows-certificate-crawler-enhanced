@@ -44,6 +44,17 @@
                 powershell.exe -ExecutionPolicy Bypass -File "{{ cc_path }}validate_fid_access.ps1"
               register: fid_access_check
               failed_when: fid_access_check.rc != 0
+
+            - name: Log FID validation result
+              win_shell: |
+                $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+                Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...security_manager: FID validation completed successfully"
+              when: fid_access_check.rc == 0
+
+            - name: Remove FID validation script
+              win_file:
+                path: "{{ cc_path }}validate_fid_access.ps1"
+                state: absent
           when: fid is defined and fid != ""
 
         - name: Log certificate collection mode
@@ -140,7 +151,7 @@
             name: windows_cert_crawler_install_notify
             tasks_from: send_mail
           vars:
-            notify_to: "{{ fid }}"
+            notify_to: "{{ soeid }}"
 
         - name: Log crawler completion
           win_shell: |
@@ -160,50 +171,34 @@
           win_shell: |
             powershell.exe -ExecutionPolicy Bypass -File "{{ cc_path }}log_failure.ps1"
 
-        - name: Check if failure is due to FID access issue
-          win_shell: |
-            if ($env:FID_ACCESS_ERROR) {
-              Write-Output "FID_ACCESS_FAILURE"
-            } else {
-              Write-Output "GENERAL_FAILURE"
-            }
-          register: failure_type
-
         - name: Notify FID access failure mail
           include_role:
             name: windows_cert_crawler_install_notify
             tasks_from: send_mail
           vars:
-            notify_to: "{{ fid }}"
+            notify_to: "{{ soeid }}"
             notify_subject: "ACCESS DENIED: FID {{ fid }} lacks access to {{ installation_path }}"
             notify_body: >-
-              Hello,<br><br>
+              Hello, {{ soeid }}<br><br>
               The certificate crawler installation has <b>failed</b> because 
               FID <b>{{ fid }}</b> does not have write access to directory 
               <b>{{ installation_path }}</b>.<br><br>
               Please ensure the user has appropriate permissions and retry the installation.<br><br>
-              Error Details: {{ ansible_failed_result.msg | default('Access validation failed') }}<br><br>
+              Error Details: {{ fid_access_check.stdout | default('Access validation failed') }}<br><br>
               Thank you.
-            notify_attachment:
-              - "{{ cc_path }}playbook_runtime.log"
-              - "{{ cc_path }}failure.log"
-          when: failure_type.stdout == "FID_ACCESS_FAILURE"
+          when: "'ERROR:' in fid_access_check.stdout"
 
         - name: Notify general failure mail
           include_role:
             name: windows_cert_crawler_install_notify
             tasks_from: send_mail
           vars:
-            notify_to: "{{ fid }}"
+            notify_to: "{{ soeid }}"
             notify_subject: "ACTION REQUIRED: Certificate Crawler Failure on {{ inventory_hostname }}"
             notify_body: >-
-              Hello {{ fid }},<br><br>
+              Hello {{ soeid }},<br><br>
               The certificate crawler has <b>failed</b> on <b>{{ inventory_hostname }}</b>.<br><br>
               Please review the attached log files for detailed error information.<br><br>
               After addressing the issues, you may rerun the playbook to retry the operation.<br><br>
               Thank you.
-            notify_attachment:
-              - "{{ cc_path }}playbook_runtime.log"
-              - "{{ cc_path }}failure.log"
-          when: failure_type.stdout != "FID_ACCESS_FAILURE"
-
+          when: "'ERROR:' not in fid_access_check.stdout"
