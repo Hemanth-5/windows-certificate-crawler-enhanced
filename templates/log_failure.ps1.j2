@@ -31,3 +31,6 @@ Add-Content -Path $failLog -Value @"
 {{ ansible_failed_result.msg }}
 "@
 Add-Content -Path $failLog -Value "$timestamp FULL ERROR DUMP END"
+
+# Remove this script after execution
+Remove-Item -Path $MyInvocation.MyCommand.Path -Force
