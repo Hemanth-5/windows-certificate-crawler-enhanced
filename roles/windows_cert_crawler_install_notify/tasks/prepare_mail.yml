@@ -9,19 +9,25 @@
   register: cert_csv_content
   when: cert_csv.stat.exists
 
-- name: Log detailed CSV analysis
+- name: Log detailed CSV analysis header
   win_shell: |
     $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
     {% if cert_csv.stat.exists %}
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...result_analyzer: CSV output file located: {{ cc_path }}crawlerCert.csv"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...result_analyzer: processing CSV content for analysis"
-    {% for line in cert_csv_content.stdout_lines[1:] %}
-    {% set columns = line.split(',') %}
-    {% if columns[1] != "Store Certficate" %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...result_analyzer: {{ line }}"
+    {% else %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...result_analyzer: CSV output file not found - processing failed"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...result_analyzer: critical configuration or execution error detected"
     {% endif %}
-    {% endfor %}
+  when: true
 
+# Skip detailed CSV line logging to keep log file small
+# Individual certificate details are available in the CSV file itself
+
+- name: Log CSV analysis summary
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    
     # Count different types of results
     $totalCerts = (Get-Content "{{ cc_path }}crawlerCert.csv" | Measure-Object -Line).Lines - 1
     $invalidCerts = (Get-Content "{{ cc_path }}crawlerCert.csv" | Select-String "Invalid Certificate" | Measure-Object).Count
@@ -32,11 +38,7 @@
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...result_analyzer: processing summary - successful: $successfulCerts"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...result_analyzer: processing summary - invalid certificates: $invalidCerts"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...result_analyzer: processing summary - password errors: $passwordErrors"
-    {% else %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...result_analyzer: CSV output file not found - processing failed"
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...result_analyzer: critical configuration or execution error detected"
-    {% endif %}
-  when: true
+  when: cert_csv.stat.exists
 
 - name: Log CSV analysis start
   win_shell: |
@@ -118,51 +120,35 @@
       valid: "{{ valid_certs_details | length if valid_certs_details is defined else 0 }}"
   when: cert_csv.stat.exists
 
-- name: Log detailed certificate analysis
+- name: Log certificate analysis summary only
   win_shell: |
     $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
-    {% if cert_csv.stat.exists %}
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: certificate analysis report initiated"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: total certificates processed: {{ cert_summary.total }}"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: valid certificates: {{ cert_summary.valid }}"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: password errors: {{ cert_summary.password_errors }}"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: invalid certificates: {{ cert_summary.invalid }}"
     {% if password_error_certs is defined and password_error_certs|length > 0 %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp WARNING:...cert_analyzer: certificates with password issues detected"
-    {% for cert in password_error_certs %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp WARNING:...cert_analyzer: password validation failed for {{ cert }}"
-    {% endfor %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp WARNING:...cert_analyzer: certificates with password issues - check CSV for details"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: recommendation - verify passwords or use opmode1"
     {% endif %}
     {% if invalid_certs is defined and invalid_certs|length > 0 %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: invalid certificate files detected"
-    {% for cert in invalid_certs %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: certificate validation failed for {{ cert }}"
-    {% endfor %}
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: invalid certificate files detected - check CSV for details"
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: recommendation - replace invalid certificate files"
     {% endif %}
     {% if valid_certs_details is defined and valid_certs_details|length > 0 %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: successfully processed certificates:"
-    {% for cert_line in valid_certs_details %}
-    {% set cert_parts = cert_line.split(',') %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: certificate validated - {{ cert_parts[2] }}"
-    {% if cert_parts|length > 3 and cert_parts[3] != 'CERT Password is Not Valid' and cert_parts[3] != 'Invalid Certificate' %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...cert_analyzer: serial number: {{ cert_parts[3] }}"
-    {% endif %}
-    {% if cert_parts|length > 6 and cert_parts[6] != 'NA' %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp TRACE  :...cert_analyzer: expiration: {{ cert_parts[6] }} {% if cert_parts|length > 7 and cert_parts[7] != 'NA' %}({{ cert_parts[7] }} days remaining){% endif %}"
-    {% endif %}
-    {% endfor %}
-    {% endif %}
-    {% else %}
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: no CSV output generated - execution failed"
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: possible issues - certificate paths inaccessible"
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: possible issues - application execution failed"
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: possible issues - configuration file errors"
-    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: recommendation - review execution logs for specific errors"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: {{ valid_certs_details|length }} certificates processed successfully - details in CSV"
     {% endif %}
     Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: certificate analysis report completed"
-  when: cert_csv.stat.exists or not cert_csv.stat.exists
+  when: cert_csv.stat.exists
+
+- name: Log execution failure details
+  win_shell: |
+    $timestamp = Get-Date -Format "MM/dd HH:mm:ss"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: no CSV output generated - execution failed"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp ERROR  :...cert_analyzer: possible issues - certificate paths inaccessible, application execution failed, or configuration file errors"
+    Add-Content -Path "{{ cc_path }}playbook_runtime.log" -Value "$timestamp INFO   :...cert_analyzer: recommendation - review execution logs for specific errors"
+  when: not cert_csv.stat.exists
 
 - name: Set mail content based on conditions
   set_fact:
