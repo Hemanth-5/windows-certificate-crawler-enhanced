@@ -1,12 +1,12 @@
 {
     "params": [
         {
-            "param-name": "fid",
+            "param-name": "soeid",
             "default-value": "22z225@psgtech.ac.in"
         },
         {
             "param-name": "installation_path",
-            "default-value": "C:/Temp/CertCrawler/"
+            "default-value": "C:/Program Files/CC/"
         },
         {
             "param-name": "operation_mode",
@@ -14,11 +14,19 @@
         },
         {
             "param-name": "cert1_path",
-            "default-value": "C:/Temp/CertCrawler/test-certs/test2.p12"
+            "default-value": "C:/Temp/CertCrawler/test-certs/test1.p12"
         },
         {
             "param-name": "cert1_password",
-            "default-value": "pwd2!"
-       }
+            "default-value": "pwd1!"
+        },
+{
+            "param-name": "cert2_path",
+            "default-value": "C:/Temp/CertCrawler/test-certs/test2.p12"
+        },
+        {
+            "param-name": "cert2_password",
+            "default-value": "pwd1!"
+        }
     ]
 }

@@ -1,12 +1,12 @@
 {
     "params": [
         {
-            "param-name": "fid",
-            "default-value": "HEMANTH/testuser2"
+            "param-name": "soeid",
+            "default-value": "22z225@psgtech.ac.in"
         },
         {
             "param-name": "installation_path",
-            "default-value": "C:/Temp/CertCrawler/"
+            "default-value": "C:/Program Files/CC/"
         },
         {
             "param-name": "operation_mode",
@@ -14,11 +14,35 @@
         },
         {
             "param-name": "cert1_dir_path",
-            "default-value": "C:/Temp/CertCrawler/test-certs/"
+            "default-value": "C:/certs/certificates/client_certificates"
         },
         {
             "param-name": "cert1_types",
             "default-value": "p12,cer"
+        },
+        {
+            "param-name": "cert2_dir_path",
+            "default-value": "C:/certs/certificates/development_certs"
+        },
+        {
+            "param-name": "cert2_types",
+            "default-value": "p12,cer"
+        },
+        {
+            "param-name": "cert3_dir_path",
+            "default-value": "C:/certs/certificates/internal_services"
+        },
+        {
+            "param-name": "cert3_types",
+            "default-value": "p12,cer,pem"
+        },
+        {
+            "param-name": "cert4_dir_path",
+            "default-value": "C:/certs/certificates/web_servers"
+        },
+        {
+            "param-name": "cert4_types",
+            "default-value": "p12,cer,pem,crt"
         },
         {
             "param-name": "extract_root_certs",
