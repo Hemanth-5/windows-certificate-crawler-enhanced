@@ -19,15 +19,42 @@
   register: config_file
 
 - block:
-    - name: Download CertCrawler
+    - name: Create temp folder
+      win_file:
+        path: "{{ installation_path }}temp"
+        state: directory
+
+    - name: Download CertCrawler to temp folder
       win_get_url:
         url: "{{ config_installation_url }}"
-        dest: "{{ installation_path }}cert_crawler_windows_v1.0.0.zip"
+        dest: "{{ installation_path }}temp/cert_crawler_windows_v1.0.0.zip"
    
-    - name: Unzip CertCrawler
+    - name: Unzip CertCrawler in temp folder
       win_unzip:
-        src: "{{ installation_path }}cert_crawler_windows_v1.0.0.zip"
-        dest: "{{ installation_path }}"
+        src: "{{ installation_path }}temp/cert_crawler_windows_v1.0.0.zip"
+        dest: "{{ installation_path }}temp/"
+
+    - name: Move Encrypt.exe files to installation path
+      win_copy:
+        src: "{{ installation_path }}temp/cert_crawler_windows_v1.0.0/Encrypt.exe"
+        dest: "{{ installation_path }}cert_crawler_windows_v1.0.0/Encrypt.exe"
+        remote_src: true
+        force: true
+    
+    - name: Move Crawler2.exe files to installation path
+      win_copy:
+        src: "{{ installation_path }}temp/cert_crawler_windows_v1.0.0/Crawler2.exe"
+        dest: "{{ installation_path }}cert_crawler_windows_v1.0.0/Crawler2.exe"
+        remote_src: true
+        force: true
+
+    - name: Move WinCert.config files to installation path if not exists
+      win_copy:
+        src: "{{ installation_path }}temp/cert_crawler_windows_v1.0.0/WinCert.config"
+        dest: "{{ installation_path }}cert_crawler_windows_v1.0.0/WinCert.config"
+        remote_src: true
+        force: true
+      when: not config_file.stat.exists 
     
     - name: Remove downloaded zip file
       win_file:
@@ -41,33 +68,6 @@
     - name: Set fact for first time installation
       set_fact:
         first_time_install: true
-
-    - name: Change ownership of installed files to FID user
-      win_shell: |
-        # Extract username from FID
-        $fidUser = "{{ fid }}"
-        if ($fidUser -contains "/") {
-          $fidUser = $fidUser.Split("/")[1]
-        } elseif ($fidUser -contains "@") {
-          $fidUser = $fidUser.Split("@")[0]
-        }
-        
-        try {
-          # Change ownership of all files in the installation directory
-          $installPath = "{{ cc_path }}"
-          Get-ChildItem -Path $installPath -Recurse | ForEach-Object {
-            $acl = Get-Acl $_.FullName
-            $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($fidUser, "FullControl", "Allow")
-            $acl.SetAccessRule($accessRule)
-            Set-Acl -Path $_.FullName -AclObject $acl
-          }
-          
-          Write-Output "Successfully changed ownership of files to user: $fidUser"
-        } catch {
-          Write-Output "Warning: Could not change ownership to FID user: $($_.Exception.Message)"
-        }
-      when: fid is defined and fid != ""
-  
   when: >
     not encrypt_exe.stat.exists or
     not crawler_exe.stat.exists or
