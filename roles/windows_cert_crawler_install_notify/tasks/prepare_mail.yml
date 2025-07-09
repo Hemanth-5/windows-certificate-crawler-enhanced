@@ -189,14 +189,14 @@
       }}
     notify_body: >-
       {% if not cert_csv.stat.exists %}
-        Hello {{ fid }},<br><br>
+        Hello {{ soeid }},<br><br>
         Certificate crawler failed on {{ inventory_hostname }} due to configuration issues.<br><br>
         <strong>Configuration Error:</strong> No certificates were processed<br>
         <strong>Likely cause:</strong> Invalid certificate paths or execution failure<br><br>
         Please check the attached log file for specific error details and fix the configuration before rerunning.
 
       {% elif password_error_certs is defined and password_error_certs|length > 0 %}
-        Hello {{ fid }},<br><br>
+        Hello {{ soeid }},<br><br>
         Certificate crawler completed with password issues on {{ inventory_hostname }}.<br><br>
         <strong>Certificates requiring password verification:</strong><br>
         {% for cert in password_error_certs %}
@@ -206,7 +206,7 @@
         Detailed analysis available in attached log file.
 
       {% elif invalid_certs is defined and invalid_certs|length > 0 %}
-        Hello {{ fid }},<br><br>
+        Hello {{ soeid }},<br><br>
         Certificate crawler found invalid certificates on {{ inventory_hostname }}.<br><br>
         <strong>Certificates requiring replacement:</strong><br>
         {% for cert in invalid_certs %}
@@ -216,7 +216,7 @@
         Detailed analysis available in attached log file.
 
       {% else %}
-        Hello {{ fid }},<br><br>
+        Hello {{ soeid }},<br><br>
         <strong>Certificate Crawler - SUCCESS</strong><br>
         Host: {{ inventory_hostname }}<br>
         Status: {{ cert_summary.total if cert_summary is defined else 'Unknown' }} certificate(s) processed successfully<br><br>
@@ -246,3 +246,7 @@
 #       - "Subject: {{ notify_subject }}"
 #       - "Body: {{ notify_body }}"
 #       - "Attachments: {{ notify_attachment if notify_attachment is defined and notify_attachment|length > 0 else 'None' }}"
+
+- name: Add csv as attachment if exists
+  set_fact:
+    notify_attachment: "{{ notify_attachment + [cc_path + 'crawlerCert.csv'] if cert_csv.stat.exists else notify_attachment }}"
